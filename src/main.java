@@ -12,52 +12,115 @@ import org.snmp4j.transport.DefaultUdpTransportMapping;
 import java.util.Scanner;
 
 public class main {
-    private static String  ipAddress  = "127.0.0.1"; //perguntar ao usuario
-
+    private static String  ipAddress;
     private static String  port = "161";
-
-    // OID of MIB RFC 1213; Scalar Object = .iso.org.dod.internet.mgmt.mib-2.system.sysDescr.0
-    private static String  oidValue  = ".1.3.6.1.2.1.1.1.0";  // //perguntar ao usuario
-    // ends with 0 for scalar object
-
+    private static String  oidValue;
+    private static String  community;
+    private static Scanner in = new Scanner(System.in);
     private static int    snmpVersion  = SnmpConstants.version1;
 
-    private static String  community  = "public";//perguntar ao usuario
-
     public static void main(String[] args) throws Exception {
-        Scanner in = new Scanner(System.in);
 
-        System.out.println("Digite a Oid ");
-        oidValue = in.nextLine();
-
-        System.out.println("Digite a comunidade ");
-        community = in.nextLine();
-
-        System.out.println("Digite o IP: ");
+        System.out.println("Digite o IP o qual deseja receber informações: ");
         ipAddress = in.nextLine();
 
-        abreMenu();
         int optionSelected;
-        optionSelected = in.nextInt();
 
+        while (true) {
+            System.out.println("Digite a comunidade ");
+            community = in.nextLine();
+
+            System.out.println("Digite a Oid ");
+            oidValue = in.nextLine();
+
+            System.out.println("Qual operação você deseja fazer:");
+            abreMenu();
+            optionSelected = in.nextInt();
+
+            verifyOption(optionSelected);
+            java.awt.Toolkit.getDefaultToolkit().beep();
+        }
+    }
+
+    static void verifyOption(int optionSelected) throws Exception {
         switch (optionSelected){
             case 1:
-                get(ipAddress, community, oidValue);
+                get();
             case 2:
                 getnext();
+            case 3:
+                ifSet();
+            case 4:
+                ifBulk();
+            case 5:
+                ifGetDelta();
+            case 6:
+                snmpTable();
+            case 7:
+                snmpWalk();
+            case 8:
+                System.exit(0);
 
         }
-        java.awt.Toolkit.getDefaultToolkit().beep();
+    }
+
+    static void ifGetDelta(){
+        System.out.println("Digite a amostra: ");
+        int amostra = in.nextInt();
+
+        System.out.println("Digite o tempo: ");
+        int tempo = in.nextInt();
+
+        try {
+            runGetDelta(amostra, tempo);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+
+    }
+
+    static void ifSet(){
+        System.out.println("Valor a ser alterado: ");
+        String valor = in.nextLine();
+
+        try {
+            setUpTarget(valor);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+
+    }
+
+    static void ifBulk(){
+        System.out.println("Digite os non repeaters: ");
+        int nonRepeater = in.nextInt();
+
+        System.out.println("Digite os max repeaters: ");
+        int maxRepeater = in.nextInt();
+
+        try {
+            doGetBulk(nonRepeater, maxRepeater);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+
     }
 
     static void abreMenu(){
-        System.out.println("1) Get\n2) GetNext");
+        System.out.println("1) Get" +
+                "\n2)GetNext" +
+                "\n3)Set" +
+                "\n4)GetBulk" +
+                "\n5)GetDelta" +
+                "\n6)GetTable" +
+                "\n7)Walk" +
+                "\n8)Sair");
     }
 
-    public static void get(String ip, String community, String oid)throws Exception{
+    public static void get()throws Exception{
         System.out.println("SNMP GET");
 
-        String address = ip + "/" + port;
+        String address = ipAddress + "/" + port;
 
         // Create TransportMapping and Listen
         TransportMapping transport = new DefaultUdpTransportMapping();
@@ -184,8 +247,7 @@ public class main {
 
     }
 
-/*    private Target setUpTarget( final String communityName, final String targetIP, string objeto, string tipo )
-            throws IOException
+    static Target setUpTarget(/* final String communityName, final String targetIP, string objeto, string tipo*/String valor )throws IOException
     {
         final InetAddress inetAddress = InetAddress.getByName( targetIP );
         final Address address = new UdpAddress( inetAddress, portNumber );
@@ -207,7 +269,7 @@ public class main {
         return communityTarget;
     }
 
-    public static List<PDU> snmpWalk(Snmp snmp, Target target, String oid) throws IOException {
+    public static List<PDU> snmpWalk() throws IOException {
         List<PDU> pduList = new ArrayList<>();
 
         ScopedPDU pdu = new ScopedPDU();
@@ -239,7 +301,9 @@ public class main {
 
         return pduList;
     }
-    public List<SNMPTriple> querySingleSNMPTableByOID(String oid) throws IOException
+
+
+    static public List<SNMPTriple> snmpTable() throws IOException
     {
         if(oid == null || oid.isEmpty())return null;
         if(!oid.startsWith("."))oid = "."+oid;
@@ -261,5 +325,72 @@ public class main {
             }
         }
         return snmpList;
-    }*/
+    }
+
+    static public Map<String, String> doGetBulk(int nonRepeater, int maxRepeater)
+            throws IOException {
+
+        Map<String, String> result = new HashMap<>();
+        Snmp snmp = null;
+
+        try {
+
+            // Create TransportMapping and Listen
+            TransportMapping transport = new DefaultUdpTransportMapping();
+            snmp = new Snmp(transport);
+            transport.listen();
+
+            PDU pdu = new PDU();
+            pdu.setType(PDU.GETBULK);
+            pdu.setMaxRepetitions(200);
+            pdu.setNonRepeaters(0);
+            pdu.addAll(vbs);
+
+            ResponseEvent responseEvent = snmp.send(pdu, this.target);
+            PDU response = responseEvent.getResponse();
+
+            // Process Agent Response
+            if (response != null) {
+                for(VariableBinding vb : response.getVariableBindings()) {
+                    result.put("." + vb.getOid().toString(), vb.getVariable().toString());
+                }
+            } else {
+                LOG.error("Error: Agent Timeout... ");
+            }
+
+        } catch (NullPointerException ignore) {
+            // The variable table is null
+        } finally {
+            if (snmp != null) snmp.close();
+        }
+        return result;
+    }
+
+   // @param int n numero amostras
+	 // @param int m intervalo tempo
+	  //@param OID
+
+    public static void getDelta()throws Exception {
+        get();
+    }
+
+
+
+
+    public static void runGetDelta(int amostra, int tempo)throws Exception{
+
+
+        for(int i=1; i<=amostra; i++) {
+            getDelta();
+            try {
+                Thread.sleep(tempo*1000);
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+
+
+
+    }
 }
