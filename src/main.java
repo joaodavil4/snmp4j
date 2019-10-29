@@ -1,14 +1,15 @@
 
 
-import org.snmp4j.CommunityTarget;
-import org.snmp4j.PDU;
-import org.snmp4j.Snmp;
-import org.snmp4j.TransportMapping;
+import org.snmp4j.*;
 import org.snmp4j.event.ResponseEvent;
 import org.snmp4j.mp.SnmpConstants;
 import org.snmp4j.smi.*;
 import org.snmp4j.transport.DefaultUdpTransportMapping;
 
+import java.io.IOException;
+import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 
 public class main {
@@ -46,18 +47,25 @@ public class main {
         switch (optionSelected){
             case 1:
                 get();
+                break;
             case 2:
                 getnext();
+                break;
             case 3:
                 ifSet();
+                break;
             case 4:
                 ifBulk();
+                break;
             case 5:
                 ifGetDelta();
+                break;
             case 6:
                 snmpTable();
+                break;
             case 7:
                 snmpWalk();
+                break;
             case 8:
                 System.exit(0);
 
@@ -247,9 +255,10 @@ public class main {
 
     }
 
-    static Target setUpTarget(/* final String communityName, final String targetIP, string objeto, string tipo*/String valor )throws IOException
+    static void setUpTarget(/* final String communityName, final String targetIP, string objeto, string tipo*/String valor )throws IOException
     {
-        final InetAddress inetAddress = InetAddress.getByName( targetIP );
+        /*
+        final InetAddress inetAddress = InetAddress.getByName(ipAddress);
         final Address address = new UdpAddress( inetAddress, portNumber );
         final OctetString community = new OctetString( communityName );
         final TransportMapping transport = new DefaultUdpTransportMapping();
@@ -266,19 +275,37 @@ public class main {
         communityTarget.setRetries( SnmpManager.DEFAULT_RETRIES );
         // TODO Need to confirm, whether this value needs to be configures
         communityTarget.setTimeout( SnmpManager.DEFAULT_TIMEOUT );
-        return communityTarget;
+        return communityTarget;*/
     }
 
-    public static List<PDU> snmpWalk() throws IOException {
-        List<PDU> pduList = new ArrayList<>();
+    public static void setOid(String oid) throws IOException {
+        TransportMapping transport = new DefaultUdpTransportMapping();
+        transport.listen();
 
         ScopedPDU pdu = new ScopedPDU();
         OID targetOID = new OID(oid);
         pdu.add(new VariableBinding(targetOID));
+        Snmp snmp = new Snmp(transport);
+    }
+
+    public static void snmpWalk() throws IOException {
+        List<PDU> pduList = new ArrayList<>();
+
+
+
+
+
+        CommunityTarget target = new CommunityTarget();
+        target.setCommunity(new OctetString(community));
+        target.setVersion(snmpVersion);
+        target.setAddress(new UdpAddress(ipAddress));
+        target.setRetries(2);
+        target.setTimeout(1000);
 
         boolean finished = false;
         while (!finished) {
             VariableBinding vb = null;
+
             ResponseEvent respEvent = snmp.getNext(pdu, target);
 
             PDU response = respEvent.getResponse();
@@ -289,7 +316,7 @@ public class main {
                 vb = response.get(0);
             }
             // check finish
-            finished = checkWalkFinished(targetOID, pdu, vb);
+            //finished = checkWalkFinished(targetOID, pdu, vb);
             if (!finished) {
                 pduList.add(response);
 
@@ -299,13 +326,15 @@ public class main {
             }
         }
 
-        return pduList;
+        for (PDU pd: pduList) {
+            System.out.println(pd.toString());
+        }
     }
 
 
-    static public List<SNMPTriple> snmpTable() throws IOException
+    static public void snmpTable() throws IOException
     {
-        if(oid == null || oid.isEmpty())return null;
+/*        if(oid == null || oid.isEmpty())return null;
         if(!oid.startsWith("."))oid = "."+oid;
         TableUtils tUtils = new TableUtils(snmp, new DefaultPDUFactory());
         List<TableEvent> events = tUtils.getTable(getTarget(), new OID[]{new OID(oid)}, null, null);
@@ -324,13 +353,13 @@ public class main {
                 snmpList.add(new SNMPTriple(key, "", value));
             }
         }
-        return snmpList;
+        return snmpList;*/
     }
 
-    static public Map<String, String> doGetBulk(int nonRepeater, int maxRepeater)
+    static public void doGetBulk(int nonRepeater, int maxRepeater)
             throws IOException {
 
-        Map<String, String> result = new HashMap<>();
+/*        Map<String, String> result = new HashMap<>();
         Snmp snmp = null;
 
         try {
@@ -363,7 +392,7 @@ public class main {
         } finally {
             if (snmp != null) snmp.close();
         }
-        return result;
+        return result;*/
     }
 
    // @param int n numero amostras
