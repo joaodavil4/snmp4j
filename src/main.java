@@ -5,42 +5,65 @@ import org.snmp4j.event.ResponseEvent;
 import org.snmp4j.mp.SnmpConstants;
 import org.snmp4j.smi.*;
 import org.snmp4j.transport.DefaultUdpTransportMapping;
+import org.snmp4j.util.DefaultPDUFactory;
+import org.snmp4j.util.TableEvent;
+import org.snmp4j.util.TableUtils;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 public class main {
-    private static String  ipAddress;
-    private static String  port = "161";
-    private static String  oidValue;
-    private static String  community;
+    private static Configs configs;
+    private static Snmp snmp;
     private static Scanner in = new Scanner(System.in);
-    private static int    snmpVersion  = SnmpConstants.version1;
+    private static int snmpVersion  = SnmpConstants.version1;
 
     public static void main(String[] args) throws Exception {
 
+
         System.out.println("Digite o IP o qual deseja receber informações: ");
-        ipAddress = in.nextLine();
+        String ipAddress = in.next();
+
+        System.out.println("Digite a comunidade ");
+        String community = in.next();
+
+        System.out.println("Digite a Oid ");
+        String oidValue = in.next();
+
+        configs = new Configs(ipAddress, community, oidValue, "161");
 
         int optionSelected;
 
         while (true) {
-            System.out.println("Digite a comunidade ");
-            community = in.nextLine();
 
-            System.out.println("Digite a Oid ");
-            oidValue = in.nextLine();
-
-            System.out.println("Qual operação você deseja fazer:");
             abreMenu();
+            System.out.println("Qual operação você deseja fazer:");
             optionSelected = in.nextInt();
 
             verifyOption(optionSelected);
             java.awt.Toolkit.getDefaultToolkit().beep();
         }
+    }
+
+
+    static void alteraIp(){
+        System.out.println("Digite o IP o qual deseja receber informações: ");
+        configs.setIpAddress(in.next());
+    }
+
+    static void alteraCommunity(){
+        System.out.println("Digite a comunidade ");
+        configs.setCommunity(in.next());
+    }
+
+    static void alteraOid(){
+        System.out.println("Digite a OID: ");
+        configs.setOidValue(in.next());
+    }
+
+    static void alteraPort(){
+        System.out.println("Digite a porta: ");
+        configs.setPort(in.next());
     }
 
     static void verifyOption(int optionSelected) throws Exception {
@@ -67,8 +90,31 @@ public class main {
                 snmpWalk();
                 break;
             case 8:
+                abreMenuConfigs();
+                verifyOptionsConfigs(in.nextInt());
+                break;
+            case 9:
                 System.exit(0);
 
+        }
+    }
+
+    static void verifyOptionsConfigs(int optionSelected) throws Exception {
+        switch (optionSelected) {
+            case 1:
+                alteraIp();
+                break;
+            case 2:
+                alteraCommunity();
+                break;
+            case 3:
+                alteraOid();
+                break;
+            case 4:
+                alteraPort();
+                break;
+            case 5:
+                break;
         }
     }
 
@@ -89,7 +135,7 @@ public class main {
 
     static void ifSet(){
         System.out.println("Valor a ser alterado: ");
-        String valor = in.nextLine();
+        String valor = in.next();
 
         try {
             setUpTarget(valor);
@@ -107,7 +153,7 @@ public class main {
         int maxRepeater = in.nextInt();
 
         try {
-            doGetBulk(nonRepeater, maxRepeater);
+            getBulk(nonRepeater, maxRepeater);
         } catch (Exception e){
             e.printStackTrace();
         }
@@ -122,13 +168,20 @@ public class main {
                 "\n5)GetDelta" +
                 "\n6)GetTable" +
                 "\n7)Walk" +
-                "\n8)Sair");
+                "\n8)Configurações" +
+                "\n9)Sair");
     }
 
-    public static void get()throws Exception{
-        System.out.println("SNMP GET");
+    static void abreMenuConfigs(){
+        System.out.println("1)Alterar o IP do Agente" +
+                "\n2)Alterar a comunidade" +
+                "\n3)Alterar o OID" +
+                "\n4)Alterar a porta" +
+                "\n5)Voltar");
+    }
 
-        String address = ipAddress + "/" + port;
+    static void initSnmp() throws IOException {
+        String address = configs.getIpAddress() + "/" + configs.getPort();
 
         // Create TransportMapping and Listen
         TransportMapping transport = new DefaultUdpTransportMapping();
@@ -136,7 +189,7 @@ public class main {
 
         // Create Target Address object
         CommunityTarget comtarget = new CommunityTarget();
-        comtarget.setCommunity(new OctetString(community));
+        comtarget.setCommunity(new OctetString(configs.getCommunity()));
         comtarget.setVersion(snmpVersion);
         comtarget.setAddress(new UdpAddress(address));
         comtarget.setRetries(2);
@@ -144,7 +197,35 @@ public class main {
 
         // Create the PDU object
         PDU pdu = new PDU();
-        pdu.add(new VariableBinding(new OID(oidValue)));
+        pdu.add(new VariableBinding(new OID(configs.getOidValue())));
+        pdu.setType(PDU.GET);
+        pdu.setRequestID(new Integer32(1));
+
+        // Create Snmp object for sending data to Agent
+        snmp = new Snmp(transport);
+
+    }
+
+    public static void get()throws Exception{
+        System.out.println("SNMP GET");
+
+        String address = configs.getIpAddress() + "/" + configs.getPort();
+
+        // Create TransportMapping and Listen
+        TransportMapping transport = new DefaultUdpTransportMapping();
+        transport.listen();
+
+        // Create Target Address object
+        CommunityTarget comtarget = new CommunityTarget();
+        comtarget.setCommunity(new OctetString(configs.getCommunity()));
+        comtarget.setVersion(snmpVersion);
+        comtarget.setAddress(new UdpAddress(address));
+        comtarget.setRetries(2);
+        comtarget.setTimeout(1000);
+
+        // Create the PDU object
+        PDU pdu = new PDU();
+        pdu.add(new VariableBinding(new OID(configs.getOidValue())));
         pdu.setType(PDU.GET);
         pdu.setRequestID(new Integer32(1));
 
@@ -153,6 +234,73 @@ public class main {
 
         System.out.println("Sending Request to Agent...");
         ResponseEvent response = snmp.get(pdu, comtarget);
+
+
+        // Process Agent Response
+        if (response != null)
+        {
+            System.out.println("Got Response from Agent");
+            PDU responsePDU = response.getResponse();
+
+            if (responsePDU != null)
+            {
+                int errorStatus = responsePDU.getErrorStatus();
+                int errorIndex = responsePDU.getErrorIndex();
+                String errorStatusText = responsePDU.getErrorStatusText();
+
+                if (errorStatus == PDU.noError)
+                {
+                    System.out.println("Snmp Get Response = " + responsePDU.getVariableBindings());
+                }
+                else
+                {
+                    System.out.println("Error: Request Failed");
+                    System.out.println("Error Status = " + errorStatus);
+                    System.out.println("Error Index = " + errorIndex);
+                    System.out.println("Error Status Text = " + errorStatusText);
+                }
+            }
+            else
+            {
+                System.out.println("Error: Response PDU is null");
+            }
+        }
+        else
+        {
+            System.out.println("Error: Agent Timeout... ");
+        }
+        snmp.close();
+    }
+
+    public static void getDeltaa()throws Exception{
+        System.out.println("SNMP GET");
+
+        String address = configs.getIpAddress() + "/" + configs.getPort();
+
+        // Create TransportMapping and Listen
+        TransportMapping transport = new DefaultUdpTransportMapping();
+        transport.listen();
+
+        // Create Target Address object
+        CommunityTarget comtarget = new CommunityTarget();
+        comtarget.setCommunity(new OctetString(configs.getCommunity()));
+        comtarget.setVersion(snmpVersion);
+        comtarget.setAddress(new UdpAddress(address));
+        comtarget.setRetries(2);
+        comtarget.setTimeout(1000);
+
+        // Create the PDU object
+        PDU pdu = new PDU();
+        pdu.add(new VariableBinding(new OID(configs.getOidValue())));
+        pdu.setType(PDU.GET);
+        pdu.setRequestID(new Integer32(1));
+
+        // Create Snmp object for sending data to Agent
+        Snmp snmp = new Snmp(transport);
+
+        System.out.println("Sending Request to Agent...");
+        ResponseEvent response = snmp.get(pdu, comtarget);
+
 
         // Process Agent Response
         if (response != null)
@@ -191,7 +339,7 @@ public class main {
     }
 
     public static void getnext()throws Exception{
-        System.out.println("SNMP GET-NEXT Simple Request");
+        System.out.println("SNMP GET-NEXT");
 
         // Create TransportMapping and Listen
         TransportMapping transport = new DefaultUdpTransportMapping();
@@ -199,17 +347,18 @@ public class main {
 
         // Create Target Address object
         CommunityTarget comtarget = new CommunityTarget();
-        comtarget.setCommunity(new OctetString(community));
+        comtarget.setCommunity(new OctetString(configs.getCommunity()));
         comtarget.setVersion(snmpVersion);
-        comtarget.setAddress(new UdpAddress(ipAddress + "/" + port));
+        comtarget.setAddress(new UdpAddress(configs.getIpAddress() + "/" + configs.getPort()));
         comtarget.setRetries(2);
         comtarget.setTimeout(1000);
 
         // Create the PDU object
         PDU pdu = new PDU();
-        pdu.add(new VariableBinding(new OID(oidValue)));
+        pdu.add(new VariableBinding(new OID(configs.getOidValue())));
         pdu.setRequestID(new Integer32(1));
         pdu.setType(PDU.GETNEXT);
+
 
         // Create Snmp object for sending data to Agent
         Snmp snmp = new Snmp(transport);
@@ -255,7 +404,7 @@ public class main {
 
     }
 
-    static void setUpTarget(/* final String communityName, final String targetIP, string objeto, string tipo*/String valor )throws IOException
+    static void setUpTarget(String newValue)throws IOException
     {
         /*
         final InetAddress inetAddress = InetAddress.getByName(ipAddress);
@@ -289,7 +438,7 @@ public class main {
     }
 
     public static void snmpWalk() throws IOException {
-        List<PDU> pduList = new ArrayList<>();
+/*        List<PDU> pduList = new ArrayList<>();
 
 
 
@@ -328,22 +477,34 @@ public class main {
 
         for (PDU pd: pduList) {
             System.out.println(pd.toString());
-        }
+        }*/
     }
 
 
     static public void snmpTable() throws IOException
     {
-/*        if(oid == null || oid.isEmpty())return null;
-        if(!oid.startsWith("."))oid = "."+oid;
+        if(configs.getOidValue() == null || configs.getOidValue().isEmpty()) return;
+        if(!configs.getOidValue().startsWith(".")) configs.setOidValue("." + configs.getOidValue());
         TableUtils tUtils = new TableUtils(snmp, new DefaultPDUFactory());
-        List<TableEvent> events = tUtils.getTable(getTarget(), new OID[]{new OID(oid)}, null, null);
+
+        TransportMapping transport = new DefaultUdpTransportMapping();
+        transport.listen();
+
+        // Create Target Address object
+        CommunityTarget comtarget = new CommunityTarget();
+        comtarget.setCommunity(new OctetString(configs.getCommunity()));
+        comtarget.setVersion(snmpVersion);
+        comtarget.setAddress(new UdpAddress(configs.getIpAddress() + "/" + configs.getPort()));
+        comtarget.setRetries(2);
+        comtarget.setTimeout(1000);
+
+        List<TableEvent> events = tUtils.getTable(comtarget, new OID[]{new OID(configs.getOidValue())}, null, null);
 
         List<SNMPTriple> snmpList = new ArrayList<SNMPTriple>();
 
         for (TableEvent event : events) {
             if(event.isError()) {
-                logger.warning("SNMP event error: "+event.getErrorMessage());
+                System.out.println("SNMP event error: "+event.getErrorMessage());
                 continue;
                 //throw new RuntimeException(event.getErrorMessage());
             }
@@ -353,13 +514,11 @@ public class main {
                 snmpList.add(new SNMPTriple(key, "", value));
             }
         }
-        return snmpList;*/
+
+//        foreach na snmpjList
     }
 
-    static public void doGetBulk(int nonRepeater, int maxRepeater)
-            throws IOException {
-
-/*        Map<String, String> result = new HashMap<>();
+    static public void getBulk(int nonRepeater, int maxRepeater) throws IOException {
         Snmp snmp = null;
 
         try {
@@ -369,22 +528,29 @@ public class main {
             snmp = new Snmp(transport);
             transport.listen();
 
+            CommunityTarget comtarget = new CommunityTarget();
+            comtarget.setCommunity(new OctetString(configs.getCommunity()));
+            comtarget.setVersion(snmpVersion);
+            comtarget.setAddress(new UdpAddress(configs.getIpAddress() + "/" + configs.getPort()));
+            comtarget.setRetries(2);
+            comtarget.setTimeout(1000);
+
             PDU pdu = new PDU();
             pdu.setType(PDU.GETBULK);
-            pdu.setMaxRepetitions(200);
-            pdu.setNonRepeaters(0);
-            pdu.addAll(vbs);
+            pdu.setMaxRepetitions(maxRepeater);
+            pdu.setNonRepeaters(nonRepeater);
+            pdu.add(new VariableBinding(new OID(configs.getOidValue())));
 
-            ResponseEvent responseEvent = snmp.send(pdu, this.target);
+            ResponseEvent responseEvent = snmp.send(pdu, comtarget);
             PDU response = responseEvent.getResponse();
 
             // Process Agent Response
             if (response != null) {
                 for(VariableBinding vb : response.getVariableBindings()) {
-                    result.put("." + vb.getOid().toString(), vb.getVariable().toString());
+                    System.out.println(vb.getOid() + " - "+vb.getVariable().toString());
                 }
             } else {
-                LOG.error("Error: Agent Timeout... ");
+                System.err.println("Error: Agent Timeout... ");
             }
 
         } catch (NullPointerException ignore) {
@@ -392,12 +558,10 @@ public class main {
         } finally {
             if (snmp != null) snmp.close();
         }
-        return result;*/
     }
 
-   // @param int n numero amostras
-	 // @param int m intervalo tempo
-	  //@param OID
+
+
 
     public static void getDelta()throws Exception {
         get();
