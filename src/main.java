@@ -17,6 +17,9 @@ public class main {
     private static Snmp snmp;
     private static Scanner in = new Scanner(System.in);
     private static int snmpVersion  = SnmpConstants.version1;
+    private static boolean isFirstTime = true;
+    private static int getValue = 0;
+
 
     public static void main(String[] args) throws Exception {
 
@@ -138,7 +141,7 @@ public class main {
         String valor = in.next();
 
         try {
-            setUpTarget(valor);
+            set(valor);
         } catch (Exception e){
             e.printStackTrace();
         }
@@ -272,70 +275,103 @@ public class main {
         snmp.close();
     }
 
-    public static void getDeltaa()throws Exception{
-        System.out.println("SNMP GET");
+    public static void getDelta()throws Exception{
+        if (isFirstTime){
+            System.out.println("SNMP GET DELTA");
 
-        String address = configs.getIpAddress() + "/" + configs.getPort();
+            String address = configs.getIpAddress() + "/" + configs.getPort();
 
-        // Create TransportMapping and Listen
-        TransportMapping transport = new DefaultUdpTransportMapping();
-        transport.listen();
+            // Create TransportMapping and Listen
+            TransportMapping transport = new DefaultUdpTransportMapping();
+            transport.listen();
 
-        // Create Target Address object
-        CommunityTarget comtarget = new CommunityTarget();
-        comtarget.setCommunity(new OctetString(configs.getCommunity()));
-        comtarget.setVersion(snmpVersion);
-        comtarget.setAddress(new UdpAddress(address));
-        comtarget.setRetries(2);
-        comtarget.setTimeout(1000);
+            // Create Target Address object
+            CommunityTarget comtarget = new CommunityTarget();
+            comtarget.setCommunity(new OctetString(configs.getCommunity()));
+            comtarget.setVersion(snmpVersion);
+            comtarget.setAddress(new UdpAddress(address));
+            comtarget.setRetries(2);
+            comtarget.setTimeout(1000);
 
-        // Create the PDU object
-        PDU pdu = new PDU();
-        pdu.add(new VariableBinding(new OID(configs.getOidValue())));
-        pdu.setType(PDU.GET);
-        pdu.setRequestID(new Integer32(1));
+            // Create the PDU object
+            PDU pdu = new PDU();
+            pdu.add(new VariableBinding(new OID(configs.getOidValue())));
+            pdu.setType(PDU.GET);
+            pdu.setRequestID(new Integer32(1));
 
-        // Create Snmp object for sending data to Agent
-        Snmp snmp = new Snmp(transport);
+            // Create Snmp object for sending data to Agent
+            Snmp snmp = new Snmp(transport);
 
-        System.out.println("Sending Request to Agent...");
-        ResponseEvent response = snmp.get(pdu, comtarget);
+            System.out.println("Sending Request to Agent...");
+            ResponseEvent response = snmp.get(pdu, comtarget);
+
+            if (response != null) getValue = Integer.parseInt(response.getResponse().getVariableBindings().elementAt(0).toValueString());
+            else System.out.println("Error: Agent Timeout... ");
+
+            snmp.close();
+            isFirstTime = false;
 
 
-        // Process Agent Response
-        if (response != null)
-        {
-            System.out.println("Got Response from Agent");
-            PDU responsePDU = response.getResponse();
-
-            if (responsePDU != null)
-            {
-                int errorStatus = responsePDU.getErrorStatus();
-                int errorIndex = responsePDU.getErrorIndex();
-                String errorStatusText = responsePDU.getErrorStatusText();
-
-                if (errorStatus == PDU.noError)
-                {
-                    System.out.println("Snmp Get Response = " + responsePDU.getVariableBindings());
-                }
-                else
-                {
-                    System.out.println("Error: Request Failed");
-                    System.out.println("Error Status = " + errorStatus);
-                    System.out.println("Error Index = " + errorIndex);
-                    System.out.println("Error Status Text = " + errorStatusText);
-                }
-            }
-            else
-            {
-                System.out.println("Error: Response PDU is null");
-            }
         }
-        else
-        {
-            System.out.println("Error: Agent Timeout... ");
+        else {
+            String address = configs.getIpAddress() + "/" + configs.getPort();
+
+            // Create TransportMapping and Listen
+            TransportMapping transport = new DefaultUdpTransportMapping();
+            transport.listen();
+
+            // Create Target Address object
+            CommunityTarget comtarget = new CommunityTarget();
+            comtarget.setCommunity(new OctetString(configs.getCommunity()));
+            comtarget.setVersion(snmpVersion);
+            comtarget.setAddress(new UdpAddress(address));
+            comtarget.setRetries(2);
+            comtarget.setTimeout(1000);
+
+            // Create the PDU object
+            PDU pdu = new PDU();
+            pdu.add(new VariableBinding(new OID(configs.getOidValue())));
+            pdu.setType(PDU.GET);
+            pdu.setRequestID(new Integer32(1));
+
+            // Create Snmp object for sending data to Agent
+            Snmp snmp = new Snmp(transport);
+
+            System.out.println("Sending Request to Agent...");
+            ResponseEvent response = snmp.get(pdu, comtarget);
+
+
+            // Process Agent Response
+            if (response != null) {
+                System.out.println("Got Response from Agent");
+                PDU responsePDU = response.getResponse();
+                int aux = 0;
+                aux = getValue - Integer.parseInt(response.getResponse().getVariableBindings().elementAt(0).toValueString());
+                getValue = Integer.parseInt(response.getResponse().getVariableBindings().elementAt(0).toValueString());
+
+                System.out.println(aux);
+                if (responsePDU != null) {
+                    int errorStatus = responsePDU.getErrorStatus();
+                    int errorIndex = responsePDU.getErrorIndex();
+                    String errorStatusText = responsePDU.getErrorStatusText();
+
+                    if (errorStatus == PDU.noError) {
+                        System.out.println("Snmp Get Response = " + getValue);
+                    } else {
+                        System.out.println("Error: Request Failed");
+                        System.out.println("Error Status = " + errorStatus);
+                        System.out.println("Error Index = " + errorIndex);
+                        System.out.println("Error Status Text = " + errorStatusText);
+                    }
+                } else {
+                    System.out.println("Error: Response PDU is null");
+                }
+            } else {
+                System.out.println("Error: Agent Timeout... ");
+            }
+
+            snmp.close();
         }
-        snmp.close();
     }
 
     public static void getnext()throws Exception{
@@ -364,7 +400,6 @@ public class main {
         Snmp snmp = new Snmp(transport);
 
         System.out.println("Sending GetNext Request to Agent ...");
-
         ResponseEvent response = snmp.getNext(pdu, comtarget);
 
         // Process Agent Response
@@ -404,27 +439,81 @@ public class main {
 
     }
 
-    static void setUpTarget(String newValue)throws IOException
+    static void set(String newValue)throws IOException
     {
-        /*
-        final InetAddress inetAddress = InetAddress.getByName(ipAddress);
-        final Address address = new UdpAddress( inetAddress, portNumber );
-        final OctetString community = new OctetString( communityName );
-        final TransportMapping transport = new DefaultUdpTransportMapping();
-        snmp = new Snmp( transport );
-        snmp.listen();
+        System.out.println("SNMP SET");
 
-        // Creating the communityTarget object and setting its properties
-        final CommunityTarget communityTarget = new CommunityTarget();
-        communityTarget.setCommunity( community );
-        // TODO Needs to check also for v2 messages
-        communityTarget.setVersion( SnmpConstants.version1 );
-        communityTarget.setAddress( address );
-        // TODO Need to confirm, whether this value needs to be configures
-        communityTarget.setRetries( SnmpManager.DEFAULT_RETRIES );
-        // TODO Need to confirm, whether this value needs to be configures
-        communityTarget.setTimeout( SnmpManager.DEFAULT_TIMEOUT );
-        return communityTarget;*/
+        String address = configs.getIpAddress() + "/" + configs.getPort();
+
+        // Create TransportMapping and Listen
+        TransportMapping transport = new DefaultUdpTransportMapping();
+        transport.listen();
+
+        // Create Target Address object
+        CommunityTarget comtarget = new CommunityTarget();
+        comtarget.setCommunity(new OctetString(configs.getCommunity()));
+        comtarget.setVersion(snmpVersion);
+        comtarget.setAddress(new UdpAddress(address));
+        comtarget.setRetries(2);
+        comtarget.setTimeout(1000);
+
+        // Create the PDU object
+        PDU pdu = new PDU();
+
+        // Setting the Oid and Value for sysContact variable
+        OID oid = new OID(configs.getOidValue());
+        Variable var = new OctetString(newValue);
+        VariableBinding varBind = new VariableBinding(oid,var);
+        pdu.add(varBind);
+
+        pdu.setType(PDU.SET);
+        pdu.setRequestID(new Integer32(1));
+
+        // Create Snmp object for sending data to Agent
+        Snmp snmp = new Snmp(transport);
+
+        System.out.println("\nRequest:\n[ Note: Set Request is sent for sysContact oid in RFC 1213 MIB.");
+        System.out.println("Set operation will change the sysContact value to " + newValue );
+        System.out.println("Once this operation is completed, Querying for sysContact will get the value = " + newValue + " ]");
+
+        System.out.println("Request:\nSending Snmp Set Request to Agent...");
+        ResponseEvent response = snmp.set(pdu, comtarget);
+
+        // Process Agent Response
+        if (response != null)
+        {
+            System.out.println("\nResponse:\nGot Snmp Set Response from Agent");
+            PDU responsePDU = response.getResponse();
+
+            if (responsePDU != null)
+            {
+                int errorStatus = responsePDU.getErrorStatus();
+                int errorIndex = responsePDU.getErrorIndex();
+                String errorStatusText = responsePDU.getErrorStatusText();
+
+                if (errorStatus == PDU.noError)
+                {
+                    System.out.println("Snmp Set Response = " + responsePDU.getVariableBindings());
+                }
+                else
+                {
+                    System.out.println("Error: Request Failed");
+                    System.out.println("Error Status = " + errorStatus);
+                    System.out.println("Error Index = " + errorIndex);
+                    System.out.println("Error Status Text = " + errorStatusText);
+                }
+            }
+            else
+            {
+                System.out.println("Error: Response PDU is null");
+            }
+        }
+        else
+        {
+            System.out.println("Error: Agent Timeout... ");
+        }
+        snmp.close();
+
     }
 
     public static void setOid(String oid) throws IOException {
@@ -437,26 +526,35 @@ public class main {
         Snmp snmp = new Snmp(transport);
     }
 
-    public static void snmpWalk() throws IOException {
-/*        List<PDU> pduList = new ArrayList<>();
+    static void snmpWalk() throws IOException {
+        List<PDU> pduList = new ArrayList<>();
 
+        // Create TransportMapping and Listen
+        TransportMapping transport = new DefaultUdpTransportMapping();
+        transport.listen();
 
+        // Create Target Address object
+        CommunityTarget comtarget = new CommunityTarget();
+        comtarget.setCommunity(new OctetString(configs.getCommunity()));
+        comtarget.setVersion(snmpVersion);
+        comtarget.setAddress(new UdpAddress(configs.getIpAddress() + "/" + configs.getPort()));
+        comtarget.setRetries(2);
+        comtarget.setTimeout(1000);
 
+        // Create the PDU object
+        PDU pdu = new PDU();
+        OID targetOID = new OID(configs.getOidValue());
+        pdu.add(new VariableBinding(targetOID));
+        pdu.setRequestID(new Integer32(1));
+        pdu.setType(PDU.GETNEXT);
 
-
-        CommunityTarget target = new CommunityTarget();
-        target.setCommunity(new OctetString(community));
-        target.setVersion(snmpVersion);
-        target.setAddress(new UdpAddress(ipAddress));
-        target.setRetries(2);
-        target.setTimeout(1000);
+        Snmp snmp = new Snmp(transport);
 
         boolean finished = false;
         while (!finished) {
             VariableBinding vb = null;
 
-            ResponseEvent respEvent = snmp.getNext(pdu, target);
-
+            ResponseEvent respEvent = snmp.getNext(pdu, comtarget);
             PDU response = respEvent.getResponse();
 
             if (null == response) {
@@ -465,7 +563,7 @@ public class main {
                 vb = response.get(0);
             }
             // check finish
-            //finished = checkWalkFinished(targetOID, pdu, vb);
+            finished = checkWalkFinished(targetOID, pdu, vb);
             if (!finished) {
                 pduList.add(response);
 
@@ -477,18 +575,47 @@ public class main {
 
         for (PDU pd: pduList) {
             System.out.println(pd.toString());
-        }*/
+        }
+    }
+
+    private static boolean checkWalkFinished(OID targetOID, PDU pdu,
+                                             VariableBinding vb) {
+        boolean finished = false;
+        if (pdu.getErrorStatus() != 0) {
+            System.out.println("[true] responsePDU.getErrorStatus() != 0 ");
+            System.out.println(pdu.getErrorStatusText());
+            finished = true;
+        } else if (vb.getOid() == null) {
+            System.out.println("[true] vb.getOid() == null");
+            finished = true;
+        } else if (vb.getOid().size() < targetOID.size()) {
+            System.out.println("[true] vb.getOid().size() < targetOID.size()");
+            finished = true;
+        } else if (targetOID.leftMostCompare(targetOID.size(), vb.getOid()) != 0) {
+            System.out.println("[true] targetOID.leftMostCompare() != 0");
+            finished = true;
+        } else if (Null.isExceptionSyntax(vb.getVariable().getSyntax())) {
+            System.out
+                    .println("[true] Null.isExceptionSyntax(vb.getVariable().getSyntax())");
+            finished = true;
+        } else if (vb.getOid().compareTo(targetOID) <= 0) {
+            System.out.println("[true] Variable received is not "
+                    + "lexicographic successor of requested " + "one:");
+            System.out.println(vb.toString() + " <= " + targetOID);
+            finished = true;
+        }
+        return finished;
+
     }
 
 
     static public void snmpTable() throws IOException
     {
-        if(configs.getOidValue() == null || configs.getOidValue().isEmpty()) return;
-        if(!configs.getOidValue().startsWith(".")) configs.setOidValue("." + configs.getOidValue());
-        TableUtils tUtils = new TableUtils(snmp, new DefaultPDUFactory());
-
         TransportMapping transport = new DefaultUdpTransportMapping();
         transport.listen();
+
+        Snmp snmp = new Snmp(transport);
+        TableUtils tUtils = new TableUtils(snmp, new DefaultPDUFactory());
 
         // Create Target Address object
         CommunityTarget comtarget = new CommunityTarget();
@@ -515,7 +642,24 @@ public class main {
             }
         }
 
-//        foreach na snmpjList
+
+        for (SNMPTriple result : snmpList){
+            System.out.println(result.name + " - " + result.oid + "-" + result.value);
+        }
+    }
+
+    public static class SNMPTriple
+    {
+        public String oid;
+        public String name;
+        public String value;
+
+        public SNMPTriple(String oid, String name, String value)
+        {
+            this.oid = oid;
+            this.name = name;
+            this.value = value;
+        }
     }
 
     static public void getBulk(int nonRepeater, int maxRepeater) throws IOException {
@@ -563,9 +707,7 @@ public class main {
 
 
 
-    public static void getDelta()throws Exception {
-        get();
-    }
+
 
 
 
