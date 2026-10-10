@@ -34,29 +34,21 @@ On start it asks for the agent's **IP**, the **community string** and an **OID**
 | 8 | **Configurações** | Changes the IP, community, OID or port (default `161`). |
 | 9 | **Sair** | Exits. |
 
-## Sample session
+## Screenshots
 
-Real output from this program against a local `net-snmp` agent (October 2026). Inputs: agent `127.0.0.1`, community `public`, OID `1.3.6.1.2.1.1.5.0` (`sysName`), port changed to `1161` through the config menu.
+These are terminal captures of real runs against a local `net-snmp` agent (October 2026), rendered to images with the typed inputs in green. Agent `127.0.0.1`, community `public`, and the port changed to `1161` through the configuration menu. The `sysDescr` value was redacted because it contained a hostname.
 
-```text
-1) Get
-2)GetNext
-...
-Qual operação você deseja fazer:
-SNMP GET
-Sending Request to Agent...
-Got Response from Agent
-Snmp Get Response = [1.3.6.1.2.1.1.5.0 = demo-agent]
-```
+**Get and GetNext** on `sysName.0` (`1.3.6.1.2.1.1.5.0`):
 
-Then option 7 (Walk) on the `system` subtree `1.3.6.1.2.1.1`:
+![Get and GetNext](screenshots/get-getnext.png)
 
-```text
-RESPONSE[requestID=1, errorStatus=Success(0), errorIndex=0, VBS[1.3.6.1.2.1.1.1.0 = <sysDescr>]]
-RESPONSE[requestID=..., errorStatus=Success(0), errorIndex=0, VBS[1.3.6.1.2.1.1.2.0 = 1.3.6.1.4.1.8072.3.2.255]]
-RESPONSE[requestID=..., errorStatus=Success(0), errorIndex=0, VBS[1.3.6.1.2.1.1.3.0 = 0:00:07.23]]
-RESPONSE[requestID=..., errorStatus=Success(0), errorIndex=0, VBS[1.3.6.1.2.1.1.4.0 = lab@example.org]]
-```
+**Walk** over the `sysORID` column (`1.3.6.1.2.1.1.9.1.2`):
+
+![Walk](screenshots/walk.png)
+
+**GetTable** over the `ifIndex` column of the interfaces table (`1.3.6.1.2.1.2.2.1.1`):
+
+![GetTable](screenshots/table.png)
 
 ## Running it
 
@@ -87,7 +79,9 @@ src/Configs.java   Agent IP, port, community and OID holder
 
 - **SNMP v1 only**, with a community string sent in clear text; there is no v2c or v3 (authentication/encryption) support.
 - **Copy-pasted request setup.** Every operation builds its own transport, target and PDU, and the same block is repeated in almost every method instead of living in one helper. A new UDP socket is opened per request.
-- **Minimal error handling.** Timeouts and null responses are mostly printed; `Integer.parseInt` in GetDelta assumes the value is numeric.
+- **GetDelta crashes on large counters.** It parses the value with `Integer.parseInt`, so a 32-bit counter above 2,147,483,647 (for example `ifInOctets`) throws `NumberFormatException`, and a non-numeric value fails the same way. A `long` would fix it, and counter wrap-around is not handled either.
+- **GetBulk is not really bulk.** The manager is hard-wired to SNMP v1, which has no GETBULK, so agents answer with a single GetNext-style result. Bulk needs v2c.
+- **Minimal error handling.** Timeouts and null responses are mostly printed.
 - **Misleading messages.** GetNext prints "for sysObjectID" for any OID, and Walk prints debug lines like `[true] ...` when it stops.
 - **Set is always a string.** It sends the value as an `OctetString` regardless of the OID's real type, so it only works for string objects such as `sysContact`.
 - **Dead code.** `initSnmp()` and `setOid()` are never used.
